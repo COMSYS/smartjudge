@@ -1,6 +1,6 @@
 pragma solidity ^0.5.0;
 
 contract Verifier {
-    function register_verification(address alice, address bob, uint32 id, bytes32 initial_state, bytes32 evidence) public;
-    function register_verification(address alice, address bob, uint32 id, bytes32 initial_state, bytes32 evidence, bytes32 data) public;
+    function start_verification(address alice, address bob, uint32 id, bytes32 initial_agreement, bytes32 witness) public;
+    function start_verification(address alice, address bob, uint32 id, bytes32 initial_agreement, bytes32 witness, bytes32 data) public;
 }

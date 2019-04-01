@@ -1,4 +1,4 @@
-pragma solidity ^0.5.0;
+pragma solidity ^0.5.7;
 
 contract Mediator{
 
@@ -6,7 +6,7 @@ contract Mediator{
     CREATED,
     ACCEPTED,
     REVEALED,
-    CONTESTED,
+    CONTENDED,
     WAITING,
     FINISHED
   }
@@ -16,20 +16,20 @@ contract Mediator{
     address contract_address;
   }
 
-  struct Contract{
+  struct Agreement{
     ContractState state;
     address payable alice;
     uint alice_funds;
     address payable bob;
     uint bob_funds;
-    bytes32 contract_hash;
+    bytes32 agreement_hash;
     uint current_height;
     uint gascost;
   }
 
-  struct Contestion{
+  struct Contention{
     bool revealed_data;
-    bytes32 evidence;
+    bytes32 witness;
     uint32 verifier_id;
     uint256 verification_fee_made;
   }
@@ -37,100 +37,100 @@ contract Mediator{
   uint256 SECURITY_DEPOSIT = 400000; // 400000 gas worst case costs until verification for Alice
   uint64 TIMEOUT_BLOCKS = 6 * 60 * 24; // 24 hours
 
-  mapping(uint32 => Contract) contracts;
+  mapping(uint32 => Agreement) agreements;
   mapping(uint32 => Verification) verifications;
   mapping(uint256 => bytes32) data;
-  mapping(uint256 => Contestion) contestions;
+  mapping(uint256 => Contention) contentions;
 
   uint32 verifier_counter = 0;
-  uint32 contract_counter = 0;
+  uint32 storage_counter = 0;
 
   /**
    * Lets Alice create a new contract based on a hash and returns
    * the id to process this contract. A price higher or equal to
-   * the SECURITY_DEPOSIT has to be put in escrow. Everything above the 
+   * the SECURITY_DEPOSIT has to be put in escrow. Everything above the
    * SECURITY_DEPOSIT is the payment to Bob in case that the contract ends gracefully.
    *
-   * @param     contract_hash   Hash of the selected verifier and the initial terms of the contract
+   * @param     agreement_hash   Hash of the selected verifier and the initial terms of the contract
    *
    * @return    Id used to process this contract
    **/
-  function create(bytes32 contract_hash) public payable returns (uint32 id){
-      require(msg.value >= SECURITY_DEPOSIT * tx.gasprice);
+   function create(bytes32 agreement_hash) public payable returns (uint32 id){
+       require(msg.value >= SECURITY_DEPOSIT * tx.gasprice);
 
-      Contract storage c = contracts[contract_counter];
+       Agreement storage a = agreements[storage_counter];
 
-      c.state = ContractState.CREATED;
-      c.contract_hash = contract_hash;
-      c.alice = msg.sender;
-      c.alice_funds = SECURITY_DEPOSIT * tx.gasprice;
-      c.bob_funds = msg.value - SECURITY_DEPOSIT * tx.gasprice;
-      c.current_height = block.number;
-      c.gascost = tx.gasprice;
-      
-      return contract_counter++;
-  }
+       a.state = ContractState.CREATED;
+       a.agreement_hash = agreement_hash;
+       a.alice = msg.sender;
+       a.alice_funds = SECURITY_DEPOSIT * tx.gasprice;
+       a.bob_funds = msg.value - SECURITY_DEPOSIT * tx.gasprice;
+       a.current_height = block.number;
+       a.gascost = tx.gasprice;
+
+       return storage_counter++;
+   }
 
   /**
    * Lets Alice create a new contract based on a hash.
    * The id to process the contract is preselected to that of
    * a finished contract, in order to reuse the storage.
    * A price higher or equal to
-   * the SECURITY_DEPOSIT has to be put in escrow. Everything above the 
+   * the SECURITY_DEPOSIT has to be put in escrow. Everything above the
    * SECURITY_DEPOSIT is the payment to Bob in case that the contract ends gracefully.
    *
    * @param id              Id selected for the processing of this contract
-   * @param contract_hash   Hash of the selected verifier and the initial terms of the contract
+   * @param agreement_hash  Hash of the selected verifier and the initial terms of the contract
    **/
-  function create(uint32 id, bytes32 contract_hash) public payable{
-      Contract storage c = contracts[id];
+   function create(uint32 id, bytes32 agreement_hash) public payable{
+       Agreement storage a = agreements[id];
 
-      require(msg.value >= SECURITY_DEPOSIT * tx.gasprice);
-      require(c.state == ContractState.FINISHED);
+       require(msg.value >= SECURITY_DEPOSIT * tx.gasprice);
+       require(a.state == ContractState.FINISHED);
 
-      c.state = ContractState.CREATED;
-      c.contract_hash = contract_hash;
-      c.alice = msg.sender;
-      c.alice_funds = SECURITY_DEPOSIT * tx.gasprice;
-      c.bob_funds = msg.value - SECURITY_DEPOSIT * tx.gasprice;
-      c.current_height = block.number;
-  }
+       a.state = ContractState.CREATED;
+       a.agreement_hash = agreement_hash;
+       a.alice = msg.sender;
+       a.alice_funds = SECURITY_DEPOSIT * tx.gasprice;
+       a.bob_funds = msg.value - SECURITY_DEPOSIT * tx.gasprice;
+       a.current_height = block.number;
+   }
 
   /**
    * This function lets Alice cancel a contract as long as no one accepted it beforehand.
    *
    * @param id              The id of the processed contract
    **/
-  function abort(uint32 id) public{
-      Contract storage c = contracts[id];
+   function abort(uint32 id) public{
+       Agreement storage a = agreements[id];
 
-      require(msg.sender == c.alice);
-      require(c.state == ContractState.CREATED);
+       require(msg.sender == a.alice);
+       require(a.state == ContractState.CREATED);
 
-      c.alice.transfer(c.alice_funds + c.bob_funds);
-      c.state = ContractState.FINISHED;
-  }
+       a.alice.transfer(a.alice_funds + a.bob_funds);
+       a.state = ContractState.FINISHED;
+   }
 
   /**
    * This function lets Bob accept a contract.
    * A deposit covering at least the TRADE_STAKE has to be made.
-   * An increased deposit could be used if the two party protocol temporarly 
+   * An increased deposit could be used if the two party protocol temporarly
    * puts Alice at a monetary disadvantage.
-   * 
+   *
    * @param id              The id of the processed contract
    **/
-  function accept(uint32 id) payable public{
+   function accept(uint32 id) payable public{
 
-      Contract storage c = contracts[id];
+       Agreement storage a = agreements[id];
 
-      require(c.state == ContractState.CREATED);
-      require(msg.value >= SECURITY_DEPOSIT * tx.gasprice);
+       require(a.state == ContractState.CREATED);
+       require(msg.value >= SECURITY_DEPOSIT * tx.gasprice);
 
-      c.bob = msg.sender;
-      c.bob_funds += msg.value;
-      c.current_height = block.number;
-      c.state = ContractState.ACCEPTED;
-  }
+       a.bob = msg.sender;
+       a.bob_funds += msg.value;
+       a.current_height = block.number;
+       a.state = ContractState.ACCEPTED;
+   }
 
   /**
    * This function lets Alice end a contract gracefully.
@@ -139,17 +139,17 @@ contract Mediator{
    *
    * @param id              The id of the processed contract
    **/
-  function finish(uint32 id) public{
+   function finish(uint32 id) public{
 
-      Contract storage c = contracts[id];
+       Agreement storage a = agreements[id];
 
-      require(c.state == ContractState.ACCEPTED || c.state == ContractState.REVEALED || c.state == ContractState.CONTESTED);
-      require(msg.sender == c.alice);
+       require(a.state == ContractState.ACCEPTED || a.state == ContractState.REVEALED || a.state == ContractState.CONTENDED);
+       require(msg.sender == a.alice);
 
-      c.alice.transfer(c.alice_funds);
-      c.bob.transfer(c.bob_funds);
-      c.state = ContractState.FINISHED;
-  }
+       a.alice.transfer(a.alice_funds);
+       a.bob.transfer(a.bob_funds);
+       a.state = ContractState.FINISHED;
+   }
 
   /**
    * This function lets Bob reveal a data object in case that is necessary
@@ -160,111 +160,112 @@ contract Mediator{
    * @param id              The id of the processed contract
    * @param revealed_data   Data which has to be received verifiably by Alice
    **/
-  function reveal(uint32 id, bytes32 revealed_data) public{
+   function reveal(uint32 id, bytes32 revealed_data) public{
 
-      uint256 gas_beginning = gasleft();
+       uint256 gas_beginning = gasleft();
 
-      Contract storage c = contracts[id];
+       Agreement storage a = agreements[id];
 
-      require(c.state == ContractState.ACCEPTED);
-      require(msg.sender == c.bob);
+       require(a.state == ContractState.ACCEPTED);
+       require(msg.sender == a.bob);
 
-      data[id] = revealed_data;
-      c.current_height = block.number;
-      c.state = ContractState.REVEALED;
+       data[id] = revealed_data;
+       a.current_height = block.number;
+       a.state = ContractState.REVEALED;
 
-      uint256 fees = (gas_beginning - gasleft() + 28000) * tx.gasprice/2;
-      if(fees > c.alice_funds){
-          fees = c.alice_funds;
-      }
-      
-      c.alice_funds -= fees;
-      c.bob_funds += fees;
-  }
+       uint256 fees = (gas_beginning - gasleft() + 28000) * tx.gasprice/2;
+       if(fees > a.alice_funds){
+           fees = a.alice_funds;
+       }
+
+       a.alice_funds -= fees;
+       a.bob_funds += fees;
+   }
 
   /**
-   * This function lets Bob contest a contract.
+   * This function lets Bob contend an execution.
    * He has to make a deposit which matches the indicated cost of the verifier,
    * which is checked later. To incentive both parties to do so,
    * the cost of the execution of this function are split between both users.
    *
    * @param id              The id of the processed contract
-   * @param evidence        Evidence brought forward by Bob
+   * @param witness        Evidence brought forward by Bob
    **/
-   function contest(uint32 id, bytes32 evidence) payable public {
+   function contest(uint32 id, bytes32 witness) payable public {
 
       uint256 gas_beginning = gasleft();
 
-      Contract storage c = contracts[id];
-      Contestion storage cont = contestions[id];
+      Agreement storage a = agreements[id];
+      Contention storage cont = contentions[id];
 
-      require(msg.sender == c.bob);
-      require(c.state == ContractState.ACCEPTED || c.state == ContractState.REVEALED);
+      require(msg.sender == a.bob);
+      require(a.state == ContractState.ACCEPTED || a.state == ContractState.REVEALED);
 
-      cont.revealed_data = (c.state == ContractState.REVEALED);
+      cont.revealed_data = (a.state == ContractState.REVEALED);
 
-      cont.evidence = evidence;
-      cont.verification_fee_made = msg.value/c.gascost;
+      cont.witness = witness;
+      cont.verification_fee_made = msg.value/a.gascost;
 
-      c.bob_funds += msg.value;
-      c.current_height = block.number;
-      c.state = ContractState.CONTESTED;
+      a.bob_funds += msg.value;
+      a.current_height = block.number;
+      a.state = ContractState.CONTENDED;
 
       uint256 fees = (gas_beginning - gasleft() + 28000) * tx.gasprice/2;
-      if(fees > c.alice_funds){
-          fees = c.alice_funds;
+      if(fees > a.alice_funds){
+          fees = a.alice_funds;
       }
 
-      c.alice_funds -= fees;
-      c.bob_funds += fees;
+      a.alice_funds -= fees;
+      a.bob_funds += fees;
    }
 
+
   /**
-   * This function lets Alice initate the verification process and provides her evidence.
+   * This function lets Alice initate the verification process, by revealing the inital plaintext agreement.
    * She has to make her deposit and the value of the depostis of both parties are checked.
    * Afterwards the control is delegated to the selected verifier.
    *
    * @param id              The id of the processed contract
    * @param verifier_id     The registration id of the agreed upon verifer
-   * @param initial_state   The initally agreed upon state by both participants
+   * @param initial_witness   The initally agreed upon state by both participants
    **/
-   function init_verification_process(uint32 id, uint32 verifier_id, bytes32 initial_state) payable public {
+   function init_verification(uint32 id, uint32 verifier_id, bytes32 initial_witness) payable public {
 
-      Contract storage c = contracts[id];
+      Agreement storage a = agreements[id];
 
-      require(msg.sender == c.alice);
-      require(c.state == ContractState.CONTESTED);
+      require(msg.sender == a.alice);
+      require(a.state == ContractState.CONTENDED);
 
-      c.alice_funds += msg.value;
+      a.alice_funds += msg.value;
 
-      if( c.contract_hash == sha256(abi.encodePacked(verifier_id, initial_state)) ){
+      if( a.agreement_hash == sha256(abi.encodePacked(verifier_id, initial_witness)) ){
 
-          contestions[id].verifier_id = verifier_id;
+          contentions[id].verifier_id = verifier_id;
           Verifier used_verifier = Verifier(verifications[verifier_id].contract_address);
 
-          if(contestions[id].verification_fee_made != verifications[verifier_id].costs){
-            c.alice.transfer(c.bob_funds + c.alice_funds);
-            c.state = ContractState.FINISHED;
+          if(contentions[id].verification_fee_made != verifications[verifier_id].costs){
+            a.alice.transfer(a.bob_funds + a.alice_funds);
+            a.state = ContractState.FINISHED;
             return;
           }
 
-          if(msg.value/c.gascost != verifications[verifier_id].costs){
-            c.bob.transfer(c.bob_funds + c.alice_funds);
-            c.state = ContractState.FINISHED;
+          if(msg.value/a.gascost != verifications[verifier_id].costs){
+            a.bob.transfer(a.bob_funds + a.alice_funds);
+            a.state = ContractState.FINISHED;
             return;
           }
 
-          if(contestions[id].revealed_data)
-            used_verifier.register_verification(c.alice, c.bob, id, initial_state, contestions[id].evidence, data[id]);
+          if(contentions[id].revealed_data)
+            used_verifier.start_verification(a.alice, a.bob, id, initial_witness, contentions[id].witness, data[id]);
           else
-            used_verifier.register_verification(c.alice, c.bob, id, initial_state, contestions[id].evidence);
+            used_verifier.start_verification(a.alice, a.bob, id, initial_witness, contentions[id].witness);
 
-          c.state = ContractState.WAITING;
+          a.state = ContractState.WAITING;
 
       } else {
 
-          c.bob.transfer(c.alice_funds + c.bob_funds);
-          c.state = ContractState.FINISHED;
+          a.bob.transfer(a.alice_funds + a.bob_funds);
+          a.state = ContractState.FINISHED;
 
       }
     }
@@ -276,38 +277,38 @@ contract Mediator{
    * @param id              The id of the processed contract
    * @param honest_party    The address of the party that acted honestly during the execution of the contract
    **/
-  function verifier_callback(uint32 id, address honest_party) public{
+   function verifier_callback(uint32 id, address honest_party) public{
 
-      Contract storage c = contracts[id];
+       Agreement storage a = agreements[id];
 
-      require(c.state == ContractState.WAITING);
-      require(msg.sender == verifications[contestions[id].verifier_id].contract_address);
+       require(a.state == ContractState.WAITING);
+       require(msg.sender == verifications[contentions[id].verifier_id].contract_address);
 
-      if(honest_party == c.bob)
-        c.bob.transfer(c.bob_funds + c.alice_funds);
-      else
-        c.alice.transfer(c.bob_funds + c.alice_funds);
+       if(honest_party == a.bob)
+         a.bob.transfer(a.bob_funds + a.alice_funds);
+       else
+         a.alice.transfer(a.bob_funds + a.alice_funds);
 
-      c.state = ContractState.FINISHED;
-  }
-  
+       a.state = ContractState.FINISHED;
+   }
+
   /**
    * This function allows Alice or Bob to timeout the other party when applicable.
-   * 
+   *
    * @param id              The id of the processed contract
    **/
-  function timeout(uint32 id) public{
-       
-        Contract storage c = contracts[id];
-       
-        require( (msg.sender == c.alice && (c.state == ContractState.ACCEPTED || c.state == ContractState.REVEALED))
-                || (msg.sender == c.bob && c.state == ContractState.CONTESTED));
-                
-        require( c.current_height + TIMEOUT_BLOCKS >= block.number );
-                
-        msg.sender.transfer(c.bob_funds + c.alice_funds);
-        c.state = ContractState.FINISHED;
-   }
+   function timeout(uint32 id) public{
+
+        Agreement storage a = agreements[id];
+
+        require( (msg.sender == a.alice && (a.state == ContractState.ACCEPTED || a.state == ContractState.REVEALED))
+                 || (msg.sender == a.bob && a.state == ContractState.CONTENDED));
+
+         require( a.current_height + TIMEOUT_BLOCKS >= block.number );
+
+         msg.sender.transfer(a.bob_funds + a.alice_funds);
+         a.state = ContractState.FINISHED;
+    }
 
   /**
    * This function registers a new verifier to the notary.
@@ -319,10 +320,10 @@ contract Mediator{
    *
    * @return    Id used to select this verifier
    **/
-  function register_verifier(address verifier_address, uint256 verifier_cost) public returns (uint32 id){
-      Verification storage v = verifications[verifier_counter];
-      v.contract_address = verifier_address;
-      v.costs = verifier_cost;
-      return verifier_counter++;
-  }
+   function register_verifier(address verifier_address, uint256 verifier_cost) public returns (uint32 id){
+       Verification storage v = verifications[verifier_counter];
+       v.contract_address = verifier_address;
+       v.costs = verifier_cost;
+       return verifier_counter++;
+   }
 }

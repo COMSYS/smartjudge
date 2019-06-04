@@ -1,4 +1,4 @@
-# SmartJudge - Dispute Resolution Framework for Smart Contracts
+# SmartJudge - Dispute Resolution for Smart Contracts
 
 ## Getting Started
 

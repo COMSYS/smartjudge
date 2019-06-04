@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2019 Eric Wagner, Frederik Fuhrmann, Achim Völker, Roman Matzutt, Klaus Wehrle
+Copyright (c) 2019 Eric Wagner, Achim Völker, Frederik Fuhrmann, Roman Matzutt, Klaus Wehrle
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

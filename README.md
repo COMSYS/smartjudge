@@ -1,2 +1,13 @@
-# smartjudge
-SmartJudge, the extensible framework for smart contract-based two-party protocols
+# SmartJudge - Dispute Resolution Framework for Smart Contracts
+
+## Getting Started
+
+[-TBD-]
+
+## License
+
+This work is licensed under the MIT license.
+
+## Links
+
+* [ICBC-Paper](https://roman-matzutt.de/paper/2019-icbc-wagner-dispute-resolution.pdf)

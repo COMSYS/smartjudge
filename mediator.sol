@@ -1,4 +1,10 @@
-pragma solidity ^0.5.7;
+pragma solidity ^0.4.26;
+
+// abstract verifier contract
+contract Verifier {
+    function start_verification(address alice, address bob, uint32 id, bytes32 initial_agreement, bytes32 witness) public;
+    function start_verification(address alice, address bob, uint32 id, bytes32 initial_agreement, bytes32 witness, bytes32 data) public;
+}
 
 contract Mediator{
 
@@ -18,9 +24,9 @@ contract Mediator{
 
   struct Agreement{
     ContractState state;
-    address payable alice;
+    address alice;
     uint alice_funds;
-    address payable bob;
+    address bob;
     uint bob_funds;
     bytes32 agreement_hash;
     uint current_height;
@@ -45,6 +51,9 @@ contract Mediator{
   uint32 verifier_counter = 0;
   uint32 storage_counter = 0;
 
+  event RegisteredVerifer(address indexed _verifier, uint256 indexed _deposit, uint32 _id);
+  event TradeID(uint32 _id);
+
   /**
    * Lets Alice create a new contract based on a hash and returns
    * the id to process this contract. A price higher or equal to
@@ -55,7 +64,7 @@ contract Mediator{
    *
    * @return    Id used to process this contract
    **/
-   function create(bytes32 agreement_hash) public payable returns (uint32 id){
+   function create(bytes32 agreement_hash) public payable{
        require(msg.value >= SECURITY_DEPOSIT * tx.gasprice);
 
        Agreement storage a = agreements[storage_counter];
@@ -68,7 +77,8 @@ contract Mediator{
        a.current_height = block.number;
        a.gascost = tx.gasprice;
 
-       return storage_counter++;
+       emit TradeID(storage_counter);
+       storage_counter++;
    }
 
   /**
@@ -229,46 +239,47 @@ contract Mediator{
    * @param verifier_id     The registration id of the agreed upon verifer
    * @param initial_witness   The initally agreed upon state by both participants
    **/
-   function init_verification(uint32 id, uint32 verifier_id, bytes32 initial_witness) payable public {
+  function init_verification(uint32 id, uint32 verifier_id, bytes32 initial_witness) payable public {
 
-      Agreement storage a = agreements[id];
+    Agreement storage a = agreements[id];
 
-      require(msg.sender == a.alice);
-      require(a.state == ContractState.CONTENDED);
+    require(msg.sender == a.alice);
+    require(a.state == ContractState.CONTENDED);
 
-      a.alice_funds += msg.value;
+    a.alice_funds += msg.value;
 
-      if( a.agreement_hash == sha256(abi.encodePacked(verifier_id, initial_witness)) ){
+    if( a.agreement_hash == sha3(abi.encodePacked(verifier_id, initial_witness)) ){
 
-          contentions[id].verifier_id = verifier_id;
-          Verifier used_verifier = Verifier(verifications[verifier_id].contract_address);
+        contentions[id].verifier_id = verifier_id;
+        Verifier used_verifier = Verifier(verifications[verifier_id].contract_address);
 
-          if(contentions[id].verification_fee_made != verifications[verifier_id].costs){
-            a.alice.transfer(a.bob_funds + a.alice_funds);
-            a.state = ContractState.FINISHED;
-            return;
-          }
-
-          if(msg.value/a.gascost != verifications[verifier_id].costs){
-            a.bob.transfer(a.bob_funds + a.alice_funds);
-            a.state = ContractState.FINISHED;
-            return;
-          }
-
-          if(contentions[id].revealed_data)
-            used_verifier.start_verification(a.alice, a.bob, id, initial_witness, contentions[id].witness, data[id]);
-          else
-            used_verifier.start_verification(a.alice, a.bob, id, initial_witness, contentions[id].witness);
-
-          a.state = ContractState.WAITING;
-
-      } else {
-
-          a.bob.transfer(a.alice_funds + a.bob_funds);
+        if(contentions[id].verification_fee_made != verifications[verifier_id].costs){
+          a.alice.transfer(a.bob_funds + a.alice_funds);
           a.state = ContractState.FINISHED;
+          return;
+        }
 
-      }
+        if(msg.value/a.gascost != verifications[verifier_id].costs){
+          a.bob.transfer(a.bob_funds + a.alice_funds);
+          a.state = ContractState.FINISHED;
+          return;
+        }
+        
+        if(contentions[id].revealed_data){
+          used_verifier.start_verification(a.alice, a.bob, id, initial_witness, contentions[id].witness, data[id]);
+        } else {
+          used_verifier.start_verification(a.alice, a.bob, id, initial_witness, contentions[id].witness);
+        }
+        
+        a.state = ContractState.WAITING;
+
+    } else {
+
+        a.bob.transfer(a.alice_funds + a.bob_funds);
+        a.state = ContractState.FINISHED;
+
     }
+  }
 
   /**
    * This function should be called when the verifier contract has evaluated the claim.
@@ -320,10 +331,11 @@ contract Mediator{
    *
    * @return    Id used to select this verifier
    **/
-   function register_verifier(address verifier_address, uint256 verifier_cost) public returns (uint32 id){
+   function register_verifier(address verifier_address, uint256 verifier_cost) public{
        Verification storage v = verifications[verifier_counter];
        v.contract_address = verifier_address;
        v.costs = verifier_cost;
-       return verifier_counter++;
+       emit RegisteredVerifer(verifier_address, verifier_cost, verifier_counter);
+       verifier_counter++;
    }
 }

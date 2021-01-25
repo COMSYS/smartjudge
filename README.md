@@ -9,7 +9,7 @@ If the receiver of the traded good does not acknowledge the reception of its goo
 Through small, yet sufficient security deposits, SmartJudge ensures that an honest party is reimboursed all fees in case an on-chain verification is necessary.
 
 
-## Presentation of the Accompayning Paper at IEEE ICBC 2019
+## Presentation of the Accompanying Paper at IEEE ICBC 2019
 
 [![IMAGE ALT TEXT](https://i.imgur.com/yUlWk7O.png)](https://youtu.be/ilWwCqGA-_Y?t=2599 "IEEE ICBC Technical Session - 9 190517")
 
